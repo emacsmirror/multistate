@@ -2,10 +2,10 @@
 
 ;; Author: Matsievskiy S.V.
 ;; Maintainer: Matsievskiy S.V.
-;; Version: 0.1
-;; Package-Requires: ((emacs "24.4") (cl-lib "0.5") (ht "2.3"))
-;; Homepage: https://gitlab.com/matsievskiysv/multistate
 ;; Keywords: convenience
+;; Version: 0.1
+;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (ht "2.3"))
+;; Homepage: https://gitlab.com/matsievskiysv/multistate
 
 
 ;; This file is not part of GNU Emacs
@@ -47,7 +47,7 @@
 ;;   (multistate-replace-state-exit .  (lambda () (overwrite-mode 0)))
 ;;   :config
 ;;   ;; Emacs/Insert state
-;;   (multistate-define-state 'emacs :lighter "E")
+;;   (multistate-define-state 'Emacs :lighter "E")
 ;;   ;; Normal state
 ;;   (multistate-define-state
 ;;    'normal
@@ -144,8 +144,7 @@
 (defvar multistate--state-list (ht-create) "Multistate state registry.")
 
 (defvar multistate-suppress-map (make-keymap)
-  "Mutistate suppress map may be used as a parent for new states in order to
- suppress global keybindings.")
+  "Mutistate suppress map may be used as a parent for new states in order to suppress global keybindings.")
 (suppress-keymap multistate-suppress-map
                  multistate-suppress-no-digits)
 
@@ -157,7 +156,7 @@
 (defun multistate--set-keymap-parent (keymap parent list)
   "Set KEYMAP PARENT recursively.
 
-LIST is an alist of KEYMAP PARENT pairs from multistate--state-list."
+LIST is an alist of KEYMAP PARENT pairs from `multistate--state-list'."
   (when (and keymap parent (not (keymap-parent (eval keymap))))
     ;; (message "Multistate setting %s parent keymap for %s keymap" parent keymap)
     (set-keymap-parent (eval keymap) (eval parent))

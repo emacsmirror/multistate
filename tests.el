@@ -3,7 +3,7 @@
 ;; Author: Matsievskiy S.V.
 ;; Maintainer: Matsievskiy S.V.
 ;; Version: 20.03.28
-;; Package-Requires: ((emacs "24.4"))
+;; Package-Requires: ((emacs "25.1"))
 ;; Homepage: https://gitlab.com/matsievskiysv/multistate
 ;; Keywords: convenience
 
