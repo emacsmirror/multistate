@@ -39,13 +39,19 @@
   (should (string= (symbol-name (multistate--new-name 'name 'suffix))
                    "multistate-name-state-suffix"))
   (should (string= (symbol-name (multistate--new-name 'name))
-                   "multistate-name-state")))
+                   "multistate-name-state"))
+  (should (string= (symbol-name (multistate--new-name 'name 'suffix t))
+                   "multistate--name-state-suffix"))
+  (should (string= (symbol-name (multistate--new-name 'name nil t))
+                   "multistate--name-state")))
 
 (ert-deftest multistate-test-new-keymap ()
   "Test `multistate--maybe-create-state-keymap'."
-  (multistate--maybe-create-state-keymap test-keymap-1)
+  (multistate--maybe-create-state-keymap test-keymap-1 enable-keymap-1)
   (should (boundp 'test-keymap-1))
-  (should (keymapp test-keymap-1)))
+  (should (keymapp test-keymap-1))
+  (should (boundp 'enable-keymap-1))
+  (should-not enable-keymap-1))
 
 (ert-deftest multistate-test-create-state-hooks ()
   "Test `multistate--maybe-create-state-hooks'."
@@ -89,6 +95,10 @@
   ;; check initial parents
   (should-not (keymap-parent multistate-one-state-map))
   (should-not (keymap-parent multistate-two-state-map))
+  (add-hook 'multistate-mode-enter-hook
+            (lambda () (setq multistate-mode-enter-hook-executed t)))
+  (add-hook 'multistate-mode-exit-hook
+            (lambda () (setq multistate-mode-exit-hook-executed t)))
   (add-hook 'multistate-one-state-enter-hook
             (lambda () (setq multistate-one-state-enter-hook-executed t)))
   (add-hook 'multistate-one-state-exit-hook
@@ -99,15 +109,20 @@
             (lambda () (setq multistate-two-state-exit-hook-executed t)))
   ;; check run deferred hooks
   (setq multistate-run-deffered-hooks t)
+  (should-not (boundp 'multistate-mode-enter-hook-executed))
+  (should-not (boundp 'multistate-mode-exit-hook-executed))
   (should-not (boundp 'multistate-one-state-enter-hook-executed))
   (should-not (boundp 'multistate-one-state-exit-hook-executed))
   (should-not (boundp 'multistate-two-state-enter-hook-executed))
   (should-not (boundp 'multistate-two-state-exit-hook-executed))
   (multistate-one-state)
   (multistate-mode 1)
+  (should (boundp 'multistate-mode-enter-hook-executed))
+  (should-not (boundp 'multistate-mode-exit-hook-executed))
   (should (boundp 'multistate-one-state-enter-hook-executed))
   (should-not (boundp 'multistate-one-state-exit-hook-executed))
   (multistate-mode 0)
+  (should (boundp 'multistate-mode-exit-hook-executed))
   (should (boundp 'multistate-one-state-exit-hook-executed))
   (should-not (boundp 'multistate-two-state-enter-hook-executed))
   (should-not (boundp 'multistate-two-state-exit-hook-executed))

@@ -1,25 +1,8 @@
 `multistate-mode` is basically an [`evil-mode`](https://github.com/emacs-evil/evil) without
 [vi](https://www.vim.org/).
 It allows to define states for modal editing.
-Unlike `evil-mode` it doesn't come with predefined states and key bindings, doesn't set hooks but
-allows you to configure your system from the ground up.
-
-**Disclaimer** `multistate-mode` states are not buffer local and probably wont be until Emacs 37 arrival.
-
-## How does it work ##
-
-Emacs minor-mode key bindings
-[overwrite](https://www.gnu.org/software/emacs/manual/html_node/elisp/Searching-Keymaps.html#Searching-Keymaps)
-global key bindings.
-By setting minor mode keymap user may overwrite global `self-insert-command` keybindings with other
-functions.
-This doesn't overwrite actual global key bindings but only shadows them.
-Thus, user has Emacs operating in *Normal mode* when this minor mode is enabled and in *Insert mode*
-when it is disabled (look at [`modalka-mode`](https://github.com/mrkkrp/modalka) readme for more verbose
-description of this concept).
-`multistate-mode` takes it one step further by allowing user to define a set of minor mode keymaps.
-These keymaps are swapped in place of minor mode keymap when corresponding state is enabled thus
-allowing modal editing with multiple states.
+Unlike `evil-mode` it doesn't come with predefined states and key bindings, doesn't mess with system
+hooks so that you could configure your system the way you want.
 
 ## Installation ##
 
@@ -50,12 +33,14 @@ For example,
 
 will create `visual` state.
 
-Optional `LIGHTER` string will be used as a state indicator.
-Optional `CURSOR` argument will control cursor style when state is enabled. See documentation for
-`cursor-type` variable to learn about possible `CURSOR` values.
-Optional `PARENT` argument allows to specify [parent
+Optional arguments:
+
+* `LIGHTER` string will be used as a state indicator
+* `CURSOR` argument will control cursor style when state is enabled. See documentation for
+`cursor-type` variable to learn about possible `CURSOR` values
+* `PARENT` argument allows specifying [parent
 keymap](https://www.gnu.org/software/emacs/manual/html_node/elisp/Inheritance-and-Keymaps.html#Inheritance-and-Keymaps)
-for the current state. This will be discussed in more detail later.
+for the current state. This will be discussed in more detail later
 
 For example,
 
@@ -78,10 +63,13 @@ Call to `multistate-define-state` will create two functions:
 * `multistate-<name>-state-p`
 
 where `<name>` is a name of the state.
-In example above these names would be `multistate-visual-state` and `multistate-visual-state-p`.
+In example above these names would be `multistate-motion-state` and `multistate-motion-state-p`.
 
 The first function `multistate-<name>-state` will switch state to `<name>`, the second function
 `multistate-<name>-state-p` will test if current state is `<name>`.
+
+If function `multistate-<name>-state` is run before enabling `multistate-mode`, state `<name>` would
+be set as a default state in new buffers (see `use-package` example at the end of the page).
 
 ## Hooks ##
 
@@ -94,6 +82,9 @@ Use `add-hook` and `remove-hook` to add or remove functions from these hooks.
 These hooks will be executed upon entering and exiting state respectively.
 `multistate-run-deffered-hooks` customization option controls if hooks will be run when
 `multistate-mode` is toggled.
+
+Additionally you may use `multistate-mode-enter-hook` and `multistate-mode-exit-hook` to set
+functions to run when `multistate-mode` is enabled or disabled.
 
 ## Binding keys ##
 
@@ -113,14 +104,11 @@ You may add keybindings to it in ordinary fashion:
 
 * `multistate-lighter-indicator` -- `multistate-mode` lighter. Defaults to ` ꟽ`
 * `multistate-lighter-format` -- current state indicator format. Defaults to "❲%s❳"
-* `multistate-manage-cursor` -- if set to `t` `multistate-mode` will change cursor appearance
-  according to `:cursor` argument. If set to `nil`, cursor appearance will not be altered. Defaults
-  to `t`
 * `multistate-run-deferred-hooks` -- control if current state hooks will be run when toggling
   `multistate-mode`. Defaults to `t`
 * `multistate-suppress-no-digits`  -- do not use digits and minus sign as prefix arguments in
   `multistate-suppress-map` If set to `nil`, digits will be aliases for `C-<digit>`
-  `universal-argument` functions. Defaults to `t`
+  `universal-argument` functions. Defaults to `nil`
 
 ## `use-package` example ##
 
@@ -143,8 +131,14 @@ The following code recreates some of `evil-mode` states keybindings (just enough
   (multistate-replace-state-enter . overwrite-mode)
   (multistate-replace-state-exit .  (lambda () (overwrite-mode 0)))
   :config
-  ;; Emacs/Insert state
+  ;; Emacs state
   (multistate-define-state 'emacs :lighter "E")
+  ;; Insert state
+  (multistate-define-state
+   'insert
+   :lighter "I"
+   :cursor 'bar
+   :parent 'multistate-emacs-state-map)
   ;; Normal state
   (multistate-define-state
    'normal
@@ -168,16 +162,18 @@ The following code recreates some of `evil-mode` states keybindings (just enough
    :lighter "V"
    :cursor 'hollow
    :parent 'multistate-motion-state-map)
-  ;; Enable Normal state at startup
+  ;; Make Normal state default
   (multistate-normal-state)
   ;; Enable multistate-mode globally
   (multistate-global-mode 1)
   :bind
   (:map multistate-emacs-state-map
         ("C-z" . multistate-normal-state))
+  (:map multistate-insert-state-map
+        ("`" . multistate-normal-state))
   (:map multistate-normal-state-map
         ("C-z" . multistate-emacs-state)
-        ("i" . multistate-emacs-state)
+        ("i" . multistate-insert-state)
         ("R" . multistate-replace-state)
         ("v" . multistate-visual-state)
         ("m" . multistate-motion-state)

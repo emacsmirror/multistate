@@ -35,7 +35,7 @@
 ;;
 ;; The following example recreates some of evil-mode states keybindings
 ;;
-;; *Note:* in this example ` key is used instead of ESC to return to normal state.
+;; Note: in this example ` key is used instead of ESC to return to normal state.
 ;; (use-package multistate
 ;;   :demand
 ;;   :hook
@@ -46,8 +46,14 @@
 ;;   (multistate-replace-state-enter . overwrite-mode)
 ;;   (multistate-replace-state-exit .  (lambda () (overwrite-mode 0)))
 ;;   :config
-;;   ;; Emacs/Insert state
-;;   (multistate-define-state 'Emacs :lighter "E")
+;;   ;; Emacs state
+;;   (multistate-define-state 'emacs :lighter "E")
+;;   ;; Insert state
+;;   (multistate-define-state
+;;    'insert
+;;    :lighter "I"
+;;    :cursor 'bar
+;;    :parent 'multistate-emacs-state-map)
 ;;   ;; Normal state
 ;;   (multistate-define-state
 ;;    'normal
@@ -71,16 +77,18 @@
 ;;    :lighter "V"
 ;;    :cursor 'hollow
 ;;    :parent 'multistate-motion-state-map)
-;;   ;; Enable Normal state at startup
+;;   ;; Make Normal state default
 ;;   (multistate-normal-state)
 ;;   ;; Enable multistate-mode globally
 ;;   (multistate-global-mode 1)
 ;;   :bind
 ;;   (:map multistate-emacs-state-map
 ;;         ("C-z" . multistate-normal-state))
+;;   (:map multistate-insert-state-map
+;;         ("`" . multistate-normal-state))
 ;;   (:map multistate-normal-state-map
 ;;         ("C-z" . multistate-emacs-state)
-;;         ("i" . multistate-emacs-state)
+;;         ("i" . multistate-insert-state)
 ;;         ("R" . multistate-replace-state)
 ;;         ("v" . multistate-visual-state)
 ;;         ("m" . multistate-motion-state)
@@ -124,33 +132,42 @@
   :tag  "Multistate lighter format."
   :type 'string)
 
-(defcustom multistate-manage-cursor t
-  "Allow multistate to manage cursor style."
-  :tag  "Multistate manage cursor."
-  :type 'boolean)
-
 (defcustom multistate-run-deferred-hooks t
   "Run current state enter and exit hooks when entering and exiting multistate mode."
   :tag  "Run deferred hooks."
   :type 'boolean)
 
-(defcustom multistate-suppress-no-digits t
+(defcustom multistate-suppress-no-digits nil
   "Do not use digits and minus sign as prefix arguments in `multistate-suppress-map'."
   :tag  "Suppress digits in `multistate-suppress-map'."
   :type 'boolean)
 
 (defvar multistate--state nil "Current multistate state.")
+(make-variable-buffer-local 'multistate--state)
 
 (defvar multistate--state-list (ht-create) "Multistate state registry.")
+
+(defvar multistate--emulate-alist (list) "Multistate variable for `emulation-mode-map-alists'.")
+(add-to-list 'emulation-mode-map-alists 'multistate--emulate-alist)
 
 (defvar multistate-suppress-map (make-keymap)
   "Mutistate suppress map may be used as a parent for new states in order to suppress global keybindings.")
 (suppress-keymap multistate-suppress-map
                  multistate-suppress-no-digits)
 
-(defun multistate--new-name (state &optional suffix)
-  "Create name from STATE and SUFFIX."
-  (intern (concat "multistate-" (symbol-name state) "-state"
+(defvar multistate-mode-enter-hook (list) "Hook to run when entering multistate mode.")
+
+(defvar multistate-mode-exit-hook (list) "Hook to run when exiting multistate mode.")
+
+(defvar multistate--mode-line-message multistate-lighter-indicator
+  "Multistate lighter string.")
+(make-variable-buffer-local 'multistate--mode-line-message)
+
+(defun multistate--new-name (state &optional suffix internal)
+  "Create name from STATE and SUFFIX.
+
+If INTERNAL is t, add extra dash in the middle of the name."
+  (intern (concat "multistate-" (when internal "-") (symbol-name state) "-state"
 		  (when suffix (concat "-" (symbol-name suffix))))))
 
 (defun multistate--set-keymap-parent (keymap parent list)
@@ -166,10 +183,11 @@ LIST is an alist of KEYMAP PARENT pairs from `multistate--state-list'."
       (when parent
 	(multistate--set-keymap-parent keymap parent list)))))
 
-(defmacro multistate--maybe-create-state-keymap (name)
-  "Create NAME state keymap and set its parent."
-  `(unless (boundp (quote ,name))
-     (defvar ,name (make-sparse-keymap) ,(format "Multistate %s state keymap." name))))
+(defmacro multistate--maybe-create-state-keymap (name var)
+  "Create NAME state keymap controlled by variable VAR."
+  `(unless (and (boundp (quote ,name)) (boundp (quote ,var)))
+     (defvar ,name (make-sparse-keymap) ,(format "Multistate %s state keymap." name))
+     (defvar ,var nil ,(format "Multistate %s state keymap enable." var))))
 
 (defmacro multistate--maybe-create-state-hooks (name enter-name exit-name)
   "Create ENTER-NAME and EXIT-NAME hooks for state NAME."
@@ -186,39 +204,49 @@ LIST is an alist of KEYMAP PARENT pairs from `multistate--state-list'."
   `(progn
      (unless (boundp (quote ,enable-name))
        (defun ,enable-name ()
-         (format "switch to state %s." ,(symbol-name name))
+         (format "Multistate switch to state %s." ,(symbol-name name))
          (interactive)
          (unless (,test-name)
-           ;; run exit hook
            (when multistate-mode
+             ;; CAUTION: previous state may be nil
              (let* ((state (ht-get multistate--state-list multistate--state))
-                    (hook (when state (ht-get state 'exit-hook))))
-               (run-hooks hook)))
-           ;; set current name
-           (setq multistate--state (quote ,name))
+                    (hook (when state (ht-get state 'exit-hook)))
+                    (control (when state (ht-get state 'control))))
+               ;; run previous state exit hook
+               (run-hooks hook)
+               ;; turn off previous state keymap
+               (when control (set control nil))))
            (let* ((state (ht-get multistate--state-list (quote ,name)))
-                  (keymap (when state (ht-get state 'keymap)))
-                  (parent (when state (ht-get state 'parent)))
-                  (hook (when state (ht-get state 'enter-hook)))
-                  (cursor (when state (ht-get state 'cursor)))
-                  (lighter (when state (ht-get state 'lighter))))
+                  (keymap (ht-get state 'keymap))
+                  (parent (ht-get state 'parent))
+                  (hook (ht-get state 'enter-hook))
+                  (cursor (ht-get state 'cursor))
+                  (control (ht-get state 'control))
+                  (lighter (ht-get state 'lighter)))
+             ;; these actions do not require multistate mode to be enabled
+             ;; set current name
+             ;; in not in multistate mode - set default
+             (if multistate-mode
+                 (setq-local multistate--state (quote ,name))
+               (setq-default multistate--state (quote ,name)))
              ;; run deferred setup of keymap parent
-             (multistate--set-keymap-parent
-              keymap parent
-              (ht-map (lambda (state table) `(,(ht-get table 'keymap) . ,(ht-get table 'parent)))
-                      multistate--state-list))
-             ;; swap keymap
-             (setf (alist-get 'multistate-mode minor-mode-map-alist) (eval keymap))
+             (when (and keymap parent (not (keymap-parent (eval keymap))))
+               (multistate--set-keymap-parent
+                keymap parent
+                (ht-map (lambda (_ table)
+                          `(,(ht-get table 'keymap) . ,(ht-get table 'parent)))
+                        multistate--state-list)))
              (when multistate-mode
-               ;; change lighter
-               (when multistate-lighter-format
-                 (setcar (cdr (assq 'multistate-mode minor-mode-alist))
-                         (concat multistate-lighter-indicator
-                                 (when lighter (format multistate-lighter-format lighter))))
-                 (force-mode-line-update))
+               ;; enable keymap
+               (set control t)
+               ;; set lighter
+               (setq-local multistate--mode-line-message
+                           (concat multistate-lighter-indicator
+                                   (when lighter
+                                     (format multistate-lighter-format lighter))))
+               (force-mode-line-update)
                ;; change cursor
-               (when multistate-manage-cursor
-                 (setq-local cursor-type cursor))
+               (setq-local cursor-type cursor)
                ;; run enter hooks
                (run-hooks hook))))))
      (unless (boundp (quote ,test-name))
@@ -236,18 +264,22 @@ Use `multistate-suppress-map' to suppress global keymap bindings."
   (when (ht-contains? multistate--state-list name)
     (error (format "state %s already exists." name)))
   (let ((map-name (multistate--new-name name 'map))
+        (control-name (multistate--new-name name nil t))
         (enter-name (multistate--new-name name 'enter-hook))
         (exit-name (multistate--new-name name 'exit-hook))
         (enable-name (multistate--new-name name))
 	(test-name (multistate--new-name name 'p)))
     ;; create keymap, hooks and functions
-    (eval `(multistate--maybe-create-state-keymap ,map-name))
+    (eval `(multistate--maybe-create-state-keymap ,map-name ,control-name))
+    (add-to-list 'multistate--emulate-alist `(,control-name . ,(eval map-name)))
     (eval `(multistate--maybe-create-state-hooks ,name ,enter-name ,exit-name))
     (eval `(multistate--maybe-create-state-function ,name ,enable-name ,test-name))
+    (make-variable-buffer-local control-name)
     (ht-set! multistate--state-list name (ht<-alist `((lighter . ,lighter)
                                                       (cursor . ,cursor)
                                                       (keymap . ,map-name)
                                                       (parent . ,parent)
+                                                      (control . ,control-name)
                                                       (enter-hook . ,enter-name)
                                                       (exit-hook . ,exit-name))))
     map-name))
@@ -263,28 +295,43 @@ the mode if ARG is omitted or nil, and toggle it if ARG is
 
 This minor mode provides modal editing features by creating
 multiple keymaps and swapping them on demand."
-  nil
-  multistate-lighter-indicator
-  (make-sparse-keymap)
-  (when multistate--state
-    (let* ((state (ht-get multistate--state-list multistate--state))
-           (cursor (ht-get state 'cursor))
-           (lighter (ht-get state 'lighter))
-           (enter-hook (ht-get state 'enter-hook))
-           (exit-hook (ht-get state 'exit-hook)))
+  :group nil
+  :lighter (:eval multistate--mode-line-message)
+  :keymap nil
+  (let* ((state (ht-get multistate--state-list multistate--state))
+         (control (when state (ht-get state 'control)))
+         (cursor (when state (ht-get state 'cursor)))
+         (lighter (when state (ht-get state 'lighter)))
+         (enter-hook (when state (ht-get state 'enter-hook)))
+         (exit-hook (when state (ht-get state 'exit-hook))))
       (if multistate-mode
           (progn
-            (when multistate-manage-cursor
-              (setq-local cursor-type cursor))
-            (when multistate-lighter-format
-              (setcar (cdr (assq 'multistate-mode minor-mode-alist))
-                      (concat multistate-lighter-indicator
-                              (when lighter (format multistate-lighter-format lighter))))
-              (force-mode-line-update))
-            (when multistate-run-deferred-hooks (run-hooks enter-hook)))
+            ;; run multistate enter hook
+            (run-hooks 'multistate-mode-enter-hook)
+            (when state
+              ;; set cursor
+              (setq-local cursor-type cursor)
+              ;; set lighter
+              (setq-local multistate--mode-line-message
+                          (concat multistate-lighter-indicator
+                                  (when lighter
+                                    (format multistate-lighter-format lighter))))
+              (force-mode-line-update)
+              ;; enable keybinding
+              (set control t)
+              ;; run deferred state enter hook
+              (when multistate-run-deferred-hooks (run-hooks enter-hook))))
         (progn
-          (when multistate-manage-cursor (kill-local-variable 'cursor-type))
-          (when multistate-run-deferred-hooks (run-hooks exit-hook)))))))
+          ;; disable all keymaps
+          (ht-map (lambda (_ table) (eval `(setq-local ,(ht-get table 'control) nil)))
+                  multistate--state-list)
+          ;; unset cursor
+          ;; WARNING: this will break things if other modes would use local cursor-type
+          (kill-local-variable 'cursor-type)
+          ;; run deferred state exit hook
+          (when multistate-run-deferred-hooks (run-hooks exit-hook))
+          ;; run multistate exit hook
+          (run-hooks 'multistate-mode-exit-hook)))))
 
 (defun multistate--maybe-activate ()
   "Activate multistate mode if current buffer is not minibuffer.
