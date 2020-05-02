@@ -203,8 +203,11 @@ LIST is an alist of KEYMAP PARENT pairs from `multistate--state-list'."
   "Create ENABLE-NAME and TEST-NAME functions for state NAME."
   `(progn
      (unless (boundp (quote ,enable-name))
-       (defun ,enable-name ()
-         (format "Multistate switch to state %s." ,(symbol-name name))
+       (defun ,enable-name (&optional no-exit-hook no-enter-hook)
+         ,(format "Multistate switch to state %s.
+
+Do not run exit or enter hooks when NO-EXIT-HOOK or NO-ENTER-HOOK is t respectively."
+                  (symbol-name name))
          (interactive)
          (unless (,test-name)
            (when multistate-mode
@@ -213,7 +216,7 @@ LIST is an alist of KEYMAP PARENT pairs from `multistate--state-list'."
                     (hook (when state (ht-get state 'exit-hook)))
                     (control (when state (ht-get state 'control))))
                ;; run previous state exit hook
-               (run-hooks hook)
+               (unless no-exit-hook (run-hooks hook))
                ;; turn off previous state keymap
                (when control (set control nil))))
            (let* ((state (ht-get multistate--state-list (quote ,name)))
@@ -248,9 +251,10 @@ LIST is an alist of KEYMAP PARENT pairs from `multistate--state-list'."
                ;; change cursor
                (setq-local cursor-type cursor)
                ;; run enter hooks
-               (run-hooks hook))))))
+               (unless no-enter-hook (run-hooks hook)))))))
      (unless (boundp (quote ,test-name))
        (defun ,test-name ()
+         ,(format "Multistate test that current state is %s." (symbol-name name))
          (string= (symbol-name multistate--state) ,(symbol-name name))))))
 
 ;;;###autoload

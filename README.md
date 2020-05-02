@@ -71,6 +71,9 @@ The first function `multistate-<name>-state` will switch state to `<name>`, the 
 If function `multistate-<name>-state` is run before enabling `multistate-mode`, state `<name>` would
 be set as a default state in new buffers (see `use-package` example at the end of the page).
 
+`multistate-<name>-state` has two optional arguments: `NO-EXIT-HOOK` and `NO-ENTER-HOOK`.
+These are intended for non-interactive use.
+
 ## Hooks ##
 
 Call to `multistate-define-state` will also create two hooks:
@@ -79,7 +82,7 @@ Call to `multistate-define-state` will also create two hooks:
 * `multistate-<name>-state-exit-hook`
 
 Use `add-hook` and `remove-hook` to add or remove functions from these hooks.
-These hooks will be executed upon entering and exiting state respectively.
+These hooks will be executed upon entering and exiting state respectively (controlled by optional arguments).
 `multistate-run-deffered-hooks` customization option controls if hooks will be run when
 `multistate-mode` is toggled.
 
