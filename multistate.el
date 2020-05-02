@@ -145,7 +145,7 @@
 (defvar multistate--state nil "Current multistate state.")
 (make-variable-buffer-local 'multistate--state)
 
-(defvar multistate--state-list (ht-create) "Multistate state registry.")
+(defvar multistate--state-htable (ht-create) "Multistate state registry.")
 
 (defvar multistate--emulate-alist (list) "Multistate variable for `emulation-mode-map-alists'.")
 (add-to-list 'emulation-mode-map-alists 'multistate--emulate-alist)
@@ -158,6 +158,8 @@
 (defvar multistate-mode-enter-hook (list) "Hook to run when entering multistate mode.")
 
 (defvar multistate-mode-exit-hook (list) "Hook to run when exiting multistate mode.")
+
+(defvar multistate-change-state-hook (list) "Hook to run when changing multistate state.")
 
 (defvar multistate--mode-line-message multistate-lighter-indicator
   "Multistate lighter string.")
@@ -173,7 +175,7 @@ If INTERNAL is t, add extra dash in the middle of the name."
 (defun multistate--set-keymap-parent (keymap parent list)
   "Set KEYMAP PARENT recursively.
 
-LIST is an alist of KEYMAP PARENT pairs from `multistate--state-list'."
+LIST is an alist of KEYMAP PARENT pairs from `multistate--state-htable'."
   (when (and keymap parent (not (keymap-parent (eval keymap))))
     ;; (message "Multistate setting %s parent keymap for %s keymap" parent keymap)
     (set-keymap-parent (eval keymap) (eval parent))
@@ -212,14 +214,14 @@ Do not run exit or enter hooks when NO-EXIT-HOOK or NO-ENTER-HOOK is t respectiv
          (unless (,test-name)
            (when multistate-mode
              ;; CAUTION: previous state may be nil
-             (let* ((state (ht-get multistate--state-list multistate--state))
+             (let* ((state (ht-get multistate--state-htable multistate--state))
                     (hook (when state (ht-get state 'exit-hook)))
                     (control (when state (ht-get state 'control))))
                ;; run previous state exit hook
                (unless no-exit-hook (run-hooks hook))
                ;; turn off previous state keymap
                (when control (set control nil))))
-           (let* ((state (ht-get multistate--state-list (quote ,name)))
+           (let* ((state (ht-get multistate--state-htable (quote ,name)))
                   (keymap (ht-get state 'keymap))
                   (parent (ht-get state 'parent))
                   (hook (ht-get state 'enter-hook))
@@ -238,7 +240,7 @@ Do not run exit or enter hooks when NO-EXIT-HOOK or NO-ENTER-HOOK is t respectiv
                 keymap parent
                 (ht-map (lambda (_ table)
                           `(,(ht-get table 'keymap) . ,(ht-get table 'parent)))
-                        multistate--state-list)))
+                        multistate--state-htable)))
              (when multistate-mode
                ;; enable keymap
                (set control t)
@@ -251,11 +253,29 @@ Do not run exit or enter hooks when NO-EXIT-HOOK or NO-ENTER-HOOK is t respectiv
                ;; change cursor
                (setq-local cursor-type cursor)
                ;; run enter hooks
-               (unless no-enter-hook (run-hooks hook)))))))
+               (unless no-enter-hook
+                 (run-hooks hook)
+                 (run-hooks 'multistate-change-state-hook)))))))
      (unless (boundp (quote ,test-name))
        (defun ,test-name ()
          ,(format "Multistate test that current state is %s." (symbol-name name))
          (string= (symbol-name multistate--state) ,(symbol-name name))))))
+
+;;;###autoload
+(defun multistate-manage-variables (variable &optional write value)
+  "Read or write multistate internal data structure for current state.
+
+Return current hash table VARIABLE when write is nil,
+assign VALUE to hash table VARIABLE when write is t.
+Internal variables are: name, lighter, cursor,
+keymap, parent, control, enter-hook, exit-hook.
+Arbitrary variable may be used to store user data."
+  (when multistate--state
+    (let ((state (ht-get multistate--state-htable multistate--state)))
+      (when state
+        (if write
+            (ht-set state variable value)
+          (ht-get state variable))))))
 
 ;;;###autoload
 (cl-defun multistate-define-state (name &key lighter (cursor t) parent)
@@ -265,7 +285,7 @@ LIGHTER will be passed to `multistate-lighter-format' to indicate state.
 CURSOR will be applied when switched to this state.
 PARENT keymap will be setup for state keymap.
 Use `multistate-suppress-map' to suppress global keymap bindings."
-  (when (ht-contains? multistate--state-list name)
+  (when (ht-contains? multistate--state-htable name)
     (error (format "state %s already exists." name)))
   (let ((map-name (multistate--new-name name 'map))
         (control-name (multistate--new-name name nil t))
@@ -279,7 +299,8 @@ Use `multistate-suppress-map' to suppress global keymap bindings."
     (eval `(multistate--maybe-create-state-hooks ,name ,enter-name ,exit-name))
     (eval `(multistate--maybe-create-state-function ,name ,enable-name ,test-name))
     (make-variable-buffer-local control-name)
-    (ht-set! multistate--state-list name (ht<-alist `((lighter . ,lighter)
+    (ht-set! multistate--state-htable name (ht<-alist `((name . ,name)
+                                                      (lighter . ,lighter)
                                                       (cursor . ,cursor)
                                                       (keymap . ,map-name)
                                                       (parent . ,parent)
@@ -302,7 +323,7 @@ multiple keymaps and swapping them on demand."
   :group nil
   :lighter (:eval multistate--mode-line-message)
   :keymap nil
-  (let* ((state (ht-get multistate--state-list multistate--state))
+  (let* ((state (ht-get multistate--state-htable multistate--state))
          (control (when state (ht-get state 'control)))
          (cursor (when state (ht-get state 'cursor)))
          (lighter (when state (ht-get state 'lighter)))
@@ -328,7 +349,7 @@ multiple keymaps and swapping them on demand."
         (progn
           ;; disable all keymaps
           (ht-map (lambda (_ table) (eval `(setq-local ,(ht-get table 'control) nil)))
-                  multistate--state-list)
+                  multistate--state-htable)
           ;; unset cursor
           ;; WARNING: this will break things if other modes would use local cursor-type
           (kill-local-variable 'cursor-type)

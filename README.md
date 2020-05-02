@@ -89,6 +89,18 @@ These hooks will be executed upon entering and exiting state respectively (contr
 Additionally you may use `multistate-mode-enter-hook` and `multistate-mode-exit-hook` to set
 functions to run when `multistate-mode` is enabled or disabled.
 
+Functions from `multistate-change-state-hook` are executed upon changing states after state
+specific `multistate-<name>-state-exit-hook`.
+They are not run when `NO-EXIT-HOOK` argument is `t`.
+
+Example: show state key bindings when changing states using
+[which-key](https://github.com/justbur/emacs-which-key)
+
+```emacs-lisp
+(add-hook 'multistate-change-state-hook (lambda () (which-key-show-keymap (multistate-manage-variables 'keymap) t)))
+```
+
+
 ## Binding keys ##
 
 Created state keymap will be named:
