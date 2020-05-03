@@ -123,7 +123,7 @@
   :link   '(url-link :tag "gitlab" "https://gitlab.com/matsievskiysv/multistate"))
 
 (defcustom multistate-lighter-indicator " ꟽ"
-  "Mutistate lighter will be shown when mode is active."
+  "Multistate lighter will be shown when mode is active."
   :tag  "Multistate lighter indicator."
   :type 'string)
 
@@ -151,7 +151,7 @@
 (add-to-list 'emulation-mode-map-alists 'multistate--emulate-alist)
 
 (defvar multistate-suppress-map (make-keymap)
-  "Mutistate suppress map may be used as a parent for new states in order to suppress global keybindings.")
+  "Multistate suppress map may be used as a parent for new states in order to suppress global keybindings.")
 (suppress-keymap multistate-suppress-map
                  multistate-suppress-no-digits)
 
@@ -263,10 +263,10 @@ Do not run exit or enter hooks when NO-EXIT-HOOK or NO-ENTER-HOOK is t respectiv
 
 ;;;###autoload
 (defun multistate-manage-variables (variable &optional write value)
-  "Read or write multistate internal data structure for current state.
+  "Manage multistate internal data structure for current state.
 
-Return current hash table VARIABLE when write is nil,
-assign VALUE to hash table VARIABLE when write is t.
+Return current hash table VARIABLE when WRITE is nil,
+assign VALUE to hash table VARIABLE when WRITE is t.
 Internal variables are: name, lighter, cursor,
 keymap, parent, control, enter-hook, exit-hook.
 Arbitrary variable may be used to store user data."
