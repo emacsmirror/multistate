@@ -1,3 +1,5 @@
+[![MELPA](https://melpa.org/packages/multistate-badge.svg)](https://melpa.org/#/multistate)
+
 `multistate-mode` is basically an [`evil-mode`](https://github.com/emacs-evil/evil) without
 [vi](https://www.vim.org/).
 It allows to define states for modal editing.
@@ -12,14 +14,14 @@ To install it, type <kbd>M-x package-install RET multistate RET</kbd>.
 ## Initial state ##
 
 There's no predefined *default* state.
-With no states defined `multistate-mode` useless.
+With no defined states `multistate-mode` just sits quietly in the background.
 
 ## State definition ##
 
 In order to define state use function
 
 ```emacs-lisp
-(multistate-define-state NAME [LIGHTER] [CURSOR] [PARENT])
+(multistate-define-state NAME [LIGHTER] [CURSOR] [PARENT] [DEFAULT])
 ```
 
 The only required function argument is `NAME`.
@@ -41,6 +43,7 @@ Optional arguments:
 * `PARENT` argument allows specifying [parent
 keymap](https://www.gnu.org/software/emacs/manual/html_node/elisp/Inheritance-and-Keymaps.html#Inheritance-and-Keymaps)
 for the current state. This will be discussed in more detail later
+* `DEFAULT` mark state as default. This is an initial state for the new buffers.
 
 For example,
 
@@ -49,11 +52,13 @@ For example,
     'motion
     :lighter "M"
     :cursor 'hollow
-    :parent 'multistate-suppress-map)
+    :parent 'multistate-suppress-map
+	:default t)
 ```
 
 will create `motion` state, that is indicated my `M` lighter and hollow cursor.
 All global `self-insert-command` definitions will be overwritten as `undefined`.
+This will be a default state.
 
 ## Switching states ##
 
@@ -68,11 +73,9 @@ In example above these names would be `multistate-motion-state` and `multistate-
 The first function `multistate-<name>-state` will switch state to `<name>`, the second function
 `multistate-<name>-state-p` will test if current state is `<name>`.
 
-If function `multistate-<name>-state` is run before enabling `multistate-mode`, state `<name>` would
-be set as a default state in new buffers (see `use-package` example at the end of the page).
-
 `multistate-<name>-state` has two optional arguments: `NO-EXIT-HOOK` and `NO-ENTER-HOOK`.
-These are intended for non-interactive use.
+These are intended for non-interactive use and will inhibit `multistate-<name>-state-enter-hook`,
+`multistate-<name>-state-exit-hook` and `multistate-change-state-hook`.
 
 ## Hooks ##
 
@@ -81,8 +84,8 @@ Call to `multistate-define-state` will also create two hooks:
 * `multistate-<name>-state-enter-hook`
 * `multistate-<name>-state-exit-hook`
 
-Use `add-hook` and `remove-hook` to add or remove functions from these hooks.
-These hooks will be executed upon entering and exiting state respectively (controlled by optional arguments).
+Use `add-hook` and `remove-hook` to add or remove functions from these hooks respectively.
+These hooks will be executed upon entering and exiting state.
 `multistate-run-deffered-hooks` customization option controls if hooks will be run when
 `multistate-mode` is toggled.
 
@@ -99,7 +102,6 @@ Example: show state key bindings when changing states using
 ```emacs-lisp
 (add-hook 'multistate-change-state-hook (lambda () (which-key-show-keymap (multistate-manage-variables 'keymap) t)))
 ```
-
 
 ## Binding keys ##
 
@@ -137,7 +139,8 @@ The following code recreates some of `evil-mode` states keybindings (just enough
 
 ```emacs-lisp
 (use-package multistate
-  :demand
+  :custom
+  (multistate-global-mode t)
   :hook
   ;; enable selection is Visual state
   (multistate-visual-state-enter . (lambda () (set-mark (point))))
@@ -157,6 +160,7 @@ The following code recreates some of `evil-mode` states keybindings (just enough
   ;; Normal state
   (multistate-define-state
    'normal
+   :default t
    :lighter "N"
    :cursor 'hollow
    :parent 'multistate-suppress-map)
@@ -177,8 +181,6 @@ The following code recreates some of `evil-mode` states keybindings (just enough
    :lighter "V"
    :cursor 'hollow
    :parent 'multistate-motion-state-map)
-  ;; Make Normal state default
-  (multistate-normal-state)
   ;; Enable multistate-mode globally
   (multistate-global-mode 1)
   :bind

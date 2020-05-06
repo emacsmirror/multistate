@@ -37,7 +37,8 @@
 ;;
 ;; Note: in this example ` key is used instead of ESC to return to normal state.
 ;; (use-package multistate
-;;   :demand
+;;   :custom
+;;   (multistate-global-mode t)
 ;;   :hook
 ;;   ;; enable selection is Visual state
 ;;   (multistate-visual-state-enter . (lambda () (set-mark (point))))
@@ -57,6 +58,7 @@
 ;;   ;; Normal state
 ;;   (multistate-define-state
 ;;    'normal
+;;    :default t
 ;;    :lighter "N"
 ;;    :cursor 'hollow
 ;;    :parent 'multistate-suppress-map)
@@ -77,8 +79,6 @@
 ;;    :lighter "V"
 ;;    :cursor 'hollow
 ;;    :parent 'multistate-motion-state-map)
-;;   ;; Make Normal state default
-;;   (multistate-normal-state)
 ;;   ;; Enable multistate-mode globally
 ;;   (multistate-global-mode 1)
 ;;   :bind
@@ -230,10 +230,7 @@ Do not run exit or enter hooks when NO-EXIT-HOOK or NO-ENTER-HOOK is t respectiv
                   (lighter (ht-get state 'lighter)))
              ;; these actions do not require multistate mode to be enabled
              ;; set current name
-             ;; in not in multistate mode - set default
-             (if multistate-mode
-                 (setq-local multistate--state (quote ,name))
-               (setq-default multistate--state (quote ,name)))
+             (setq-local multistate--state (quote ,name))
              ;; run deferred setup of keymap parent
              (when (and keymap parent (not (keymap-parent (eval keymap))))
                (multistate--set-keymap-parent
@@ -278,13 +275,14 @@ Arbitrary variable may be used to store user data."
           (ht-get state variable))))))
 
 ;;;###autoload
-(cl-defun multistate-define-state (name &key lighter (cursor t) parent)
+(cl-defun multistate-define-state (name &key lighter (cursor t) parent default)
   "Define new NAME state.
 
 LIGHTER will be passed to `multistate-lighter-format' to indicate state.
 CURSOR will be applied when switched to this state.
 PARENT keymap will be setup for state keymap.
-Use `multistate-suppress-map' to suppress global keymap bindings."
+Use `multistate-suppress-map' to suppress global keymap bindings.
+Mark state to be DEFAULT if t."
   (when (ht-contains? multistate--state-htable name)
     (error (format "state %s already exists." name)))
   (let ((map-name (multistate--new-name name 'map))
@@ -298,6 +296,7 @@ Use `multistate-suppress-map' to suppress global keymap bindings."
     (add-to-list 'multistate--emulate-alist `(,control-name . ,(eval map-name)))
     (eval `(multistate--maybe-create-state-hooks ,name ,enter-name ,exit-name))
     (eval `(multistate--maybe-create-state-function ,name ,enable-name ,test-name))
+    (when default (setq-default multistate--state name))
     (make-variable-buffer-local control-name)
     (ht-set! multistate--state-htable name (ht<-alist `((name . ,name)
                                                       (lighter . ,lighter)
