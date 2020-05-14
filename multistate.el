@@ -142,6 +142,11 @@
   :tag  "Suppress digits in `multistate-suppress-map'."
   :type 'boolean)
 
+(defcustom multistate-deactivate-input-method-on-switch t
+  "Deactivate multilingual input when switching states."
+  :tag  "Deactivate input method on switch."
+  :type 'boolean)
+
 (defvar multistate--state nil "Current multistate state.")
 (make-variable-buffer-local 'multistate--state)
 
@@ -241,6 +246,9 @@ Do not run exit or enter hooks when NO-EXIT-HOOK or NO-ENTER-HOOK is t respectiv
              (when multistate-mode
                ;; enable keymap
                (set control t)
+               ;; deactivate input method
+               (when multistate-deactivate-input-method-on-switch
+                 (deactivate-input-method))
                ;; set lighter
                (setq-local multistate--mode-line-message
                            (concat multistate-lighter-indicator
