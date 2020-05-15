@@ -126,6 +126,11 @@ You may add keybindings to it in ordinary fashion:
 * `multistate-suppress-no-digits`  -- do not use digits and minus sign as prefix arguments in
   `multistate-suppress-map` If set to `nil`, digits will be aliases for `C-<digit>`
   `universal-argument` functions. Defaults to `nil`
+* `multistate-suppress-no-digits`  -- do not use digits and minus sign as prefix arguments in
+  `multistate-suppress-map` If set to `nil`, digits will be aliases for `C-<digit>`
+  `universal-argument` functions. Defaults to `nil`
+* `multistate-deactivate-input-method-on-switch` -- deactivate multilingual input when switching
+  states. Defaults to `t`
 
 ## `use-package` example ##
 
