@@ -236,13 +236,6 @@ Do not run exit or enter hooks when NO-EXIT-HOOK or NO-ENTER-HOOK is t respectiv
              ;; these actions do not require multistate mode to be enabled
              ;; set current name
              (setq-local multistate--state (quote ,name))
-             ;; run deferred setup of keymap parent
-             (when (and keymap parent (not (keymap-parent (eval keymap))))
-               (multistate--set-keymap-parent
-                keymap parent
-                (ht-map (lambda (_ table)
-                          `(,(ht-get table 'keymap) . ,(ht-get table 'parent)))
-                        multistate--state-htable)))
              (when multistate-mode
                ;; enable keymap
                (set control t)
@@ -307,13 +300,21 @@ Mark state to be DEFAULT if t."
     (when default (setq-default multistate--state name))
     (make-variable-buffer-local control-name)
     (ht-set! multistate--state-htable name (ht<-alist `((name . ,name)
-                                                      (lighter . ,lighter)
-                                                      (cursor . ,cursor)
-                                                      (keymap . ,map-name)
-                                                      (parent . ,parent)
-                                                      (control . ,control-name)
-                                                      (enter-hook . ,enter-name)
-                                                      (exit-hook . ,exit-name))))
+                                                        (lighter . ,lighter)
+                                                        (cursor . ,cursor)
+                                                        (keymap . ,map-name)
+                                                        (parent . ,parent)
+                                                        (control . ,control-name)
+                                                        (enter-hook . ,enter-name)
+                                                        (exit-hook . ,exit-name))))
+    (when parent
+      ;; This will fail until all parents are defined
+      (ignore-errors
+        (multistate--set-keymap-parent
+         map-name parent
+         (ht-map (lambda (_ table)
+                   `(,(ht-get table 'keymap) . ,(ht-get table 'parent)))
+                 multistate--state-htable))))
     map-name))
 
 ;;;###autoload
