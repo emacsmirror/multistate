@@ -37,8 +37,6 @@
 ;;
 ;; Note: in this example ` key is used instead of ESC to return to normal state.
 ;; (use-package multistate
-;;   :custom
-;;   (multistate-global-mode t)
 ;;   :hook
 ;;   ;; enable selection is Visual state
 ;;   (multistate-visual-state-enter . (lambda () (set-mark (point))))
@@ -46,7 +44,7 @@
 ;;   ;; enable overwrite-mode in Replace state
 ;;   (multistate-replace-state-enter . overwrite-mode)
 ;;   (multistate-replace-state-exit .  (lambda () (overwrite-mode 0)))
-;;   :config
+;;   :init
 ;;   ;; Emacs state
 ;;   (multistate-define-state 'emacs :lighter "E")
 ;;   ;; Insert state

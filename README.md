@@ -144,8 +144,6 @@ The following code recreates some of `evil-mode` states keybindings (just enough
 
 ```emacs-lisp
 (use-package multistate
-  :custom
-  (multistate-global-mode t)
   :hook
   ;; enable selection is Visual state
   (multistate-visual-state-enter . (lambda () (set-mark (point))))
@@ -153,7 +151,7 @@ The following code recreates some of `evil-mode` states keybindings (just enough
   ;; enable overwrite-mode in Replace state
   (multistate-replace-state-enter . overwrite-mode)
   (multistate-replace-state-exit .  (lambda () (overwrite-mode 0)))
-  :config
+  :init
   ;; Emacs state
   (multistate-define-state 'emacs :lighter "E")
   ;; Insert state
@@ -216,4 +214,3 @@ The following code recreates some of `evil-mode` states keybindings (just enough
   (:map multistate-replace-state-map
         ("`" . multistate-normal-state)))
 ```
-
