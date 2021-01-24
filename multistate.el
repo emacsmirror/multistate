@@ -3,8 +3,8 @@
 ;; Author: Matsievskiy S.V.
 ;; Maintainer: Matsievskiy S.V.
 ;; Keywords: convenience
-;; Version: 0.1
-;; Package-Requires: ((emacs "25.1") (cl-lib "0.5") (ht "2.3"))
+;; Version: 0.2
+;; Package-Requires: ((emacs "25.1") (ht "2.3"))
 ;; Homepage: https://gitlab.com/matsievskiysv/multistate
 
 
@@ -175,6 +175,18 @@ If INTERNAL is t, add extra dash in the middle of the name."
   (intern (concat "multistate-" (when internal "-") (symbol-name state) "-state"
 		  (when suffix (concat "-" (symbol-name suffix))))))
 
+(defun multistate--set-parents ()
+  "Set parents for all keymaps."
+  (let ((keymap-parent-list (ht-map (lambda (_ table)
+                                      (cons (ht-get table 'keymap)
+                                            (ht-get table 'parent)))
+                                    multistate--state-htable)))
+    ;; This will probably fail until all keymaps are defined
+    (ignore-errors
+      (dolist (pair keymap-parent-list)
+        (multistate--set-keymap-parent (car pair) (cdr pair)
+                                       keymap-parent-list)))))
+
 (defun multistate--set-keymap-parent (keymap parent list)
   "Set KEYMAP PARENT recursively.
 
@@ -305,14 +317,7 @@ Mark state to be DEFAULT if t."
                                                         (control . ,control-name)
                                                         (enter-hook . ,enter-name)
                                                         (exit-hook . ,exit-name))))
-    (when parent
-      ;; This will fail until all parents are defined
-      (ignore-errors
-        (multistate--set-keymap-parent
-         map-name parent
-         (ht-map (lambda (_ table)
-                   `(,(ht-get table 'keymap) . ,(ht-get table 'parent)))
-                 multistate--state-htable))))
+    (multistate--set-parents)
     map-name))
 
 ;;;###autoload
